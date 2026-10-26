@@ -1,0 +1,87 @@
+name: LiveWallpaper
+options:
+  bundleIdPrefix: com.hari
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    # SMAppService refuses ad-hoc signed bundles, so sign with a real identity.
+    DEVELOPMENT_TEAM: SRKA3M5T33
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "Apple Development"
+    ENABLE_HARDENED_RUNTIME: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+targets:
+  LiveWallpaper:
+    type: application
+    platform: macOS
+    sources:
+      - App
+      - Shared
+      - path: LaunchAgents/com.hari.LiveWallpaper.Agent.plist
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchAgents
+    dependencies:
+      - target: LiveWallpaperAgent
+        copy:
+          destination: executables
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hari.LiveWallpaper
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: LiveWallpaper
+        ENABLE_APP_SANDBOX: NO
+
+  LiveWallpaperAgent:
+    type: tool
+    platform: macOS
+    sources:
+      - Agent
+      - Shared
+    dependencies:
+      - sdk: IOKit.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hari.LiveWallpaper.Agent
+        GENERATE_INFOPLIST_FILE: YES
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
+        SKIP_INSTALL: YES
+
+  LiveWallpaperTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests
+      - Shared
+    dependencies:
+      # Built first so the end-to-end test can launch it; not linked or hosted.
+      - target: LiveWallpaper
+        embed: false
+        link: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hari.LiveWallpaperTests
+        GENERATE_INFOPLIST_FILE: YES
+        # Host-less: the end-to-end test quits the app, which would kill a hosted test run.
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
+schemes:
+  LiveWallpaper:
+    build:
+      targets:
+        LiveWallpaper: all
+        LiveWallpaperTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - LiveWallpaperTests
