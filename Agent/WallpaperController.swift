@@ -20,12 +20,16 @@ final class WallpaperController {
     private let power = PowerMonitor()
     private let menuBar = MenuBarController()
     private let systemWallpaper: SystemWallpaper
+    /// Plays the main screen's video on the lock screen; nil before macOS 26, where the
+    /// lock screen gets `systemWallpaper`'s stills instead.
+    private let aerial: AerialLockScreen?
     private var statusTimer: Timer?
     private var activity: NSObjectProtocol?
 
     init() {
         settings = (JSONFile.read(PlaybackSettings.self, from: paths.settings) ?? PlaybackSettings()).normalized
         systemWallpaper = SystemWallpaper(paths: paths)
+        aerial = AerialLockScreen(paths: paths)
     }
 
     func start() {
@@ -63,6 +67,14 @@ final class WallpaperController {
         }
         observeSleepAndWake()
 
+        if let aerial {
+            // Stills left from before the Aerial took over the lock screen.
+            if FileManager.default.fileExists(atPath: paths.originalDesktop.path) {
+                systemWallpaper.restore()
+            }
+            aerial.reapplySelection()
+        }
+
         power.onChange = { [weak self] in self?.updatePlayback() }
         power.start()
         installMenuBar()
@@ -85,7 +97,7 @@ final class WallpaperController {
         statusTimer = nil
         players.values.forEach { $0.tearDown() }
         players.removeAll()
-        systemWallpaper.restore()
+        restoreLockScreen()
         writeStatus()
     }
 
@@ -95,7 +107,7 @@ final class WallpaperController {
         guard let config = JSONFile.read(WallpaperConfig.self, from: paths.config) else {
             self.config = nil
             players.values.forEach { $0.stop() }
-            systemWallpaper.restore()
+            restoreLockScreen()
             updateMenu()
             writeStatus()
             return
@@ -170,10 +182,24 @@ final class WallpaperController {
             return Set(self.players.values.filter { $0 !== player }.compactMap(\.currentURL))
         }
         player.onVideoStarted = { [weak self] player, url in
-            self?.systemWallpaper.setStill(from: url, on: player.screen)
+            guard let self else { return }
+            if let aerial = self.aerial {
+                // The lock screen shows one video: whatever the main screen is playing.
+                if player.displayID == NSScreen.screens.first?.displayID { aerial.install(url) }
+            } else {
+                self.systemWallpaper.setStill(from: url, on: player.screen)
+            }
         }
         player.onStateChanged = { [weak self] in self?.updateMenu() }
         return player
+    }
+
+    private func restoreLockScreen() {
+        if let aerial {
+            aerial.restore()
+        } else {
+            systemWallpaper.restore()
+        }
     }
 
     // MARK: - Sleep and wake
@@ -288,9 +314,10 @@ final class WallpaperController {
         var description: String
         if let config {
             if let folder = config.folderURL {
-                let count = (try? FolderScanner.videos(in: folder))?.count ?? 0
-                description = "\(folder.lastPathComponent) — \(count) video\(count == 1 ? "" : "s")"
+                let counts = FolderScanner.counts(in: folder)
+                description = "\(folder.lastPathComponent) — \(counts.playable) video\(counts.playable == 1 ? "" : "s")"
                 if players.count > 1 { description += " on \(players.count) screens" }
+                if counts.tooLong > 0 { description += " (\(counts.tooLong) over 1 min skipped)" }
             } else {
                 description = config.videoURL.lastPathComponent
             }
@@ -333,7 +360,7 @@ final class WallpaperController {
         Task {
             do {
                 if folder {
-                    _ = try store.importFolder(from: url)
+                    _ = try await store.importFolder(from: url)
                 } else {
                     _ = try await store.importVideo(from: url)
                 }

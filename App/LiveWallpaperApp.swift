@@ -33,6 +33,10 @@ final class WallpaperModel: ObservableObject {
 
     init() {
         config = store.currentConfig
+        // Measure the folder's videos so the description leaves out the ones that are too long.
+        if let folder = config?.folderURL {
+            Task { folderVideoCount = try? await FolderScanner.allowedVideos(in: folder).count }
+        }
     }
 
     /// `--import <path>`: import and register without any UI interaction.
@@ -82,7 +86,7 @@ final class WallpaperModel: ObservableObject {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
 
         do {
-            let result = try store.importFolder(from: url)
+            let result = try await store.importFolder(from: url)
             config = result.config
             folderVideoCount = result.videoCount
             try WallpaperRegistrar.register()
@@ -95,8 +99,11 @@ final class WallpaperModel: ObservableObject {
     var currentDescription: String {
         guard let config else { return "None" }
         guard let folder = config.folderURL else { return config.videoURL.lastPathComponent }
-        let count = folderVideoCount ?? ((try? FolderScanner.videos(in: folder))?.count ?? 0)
-        return "\(folder.lastPathComponent) — shuffling \(count) video\(count == 1 ? "" : "s")"
+        let counts = FolderScanner.counts(in: folder)
+        let count = folderVideoCount ?? counts.playable
+        var description = "\(folder.lastPathComponent) — shuffling \(count) video\(count == 1 ? "" : "s")"
+        if counts.tooLong > 0 { description += " (\(counts.tooLong) over 1 min skipped)" }
+        return description
     }
 
     /// Clears the wallpaper but leaves the agent, and its menu bar item, running. The agent

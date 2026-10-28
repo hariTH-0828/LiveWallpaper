@@ -35,6 +35,7 @@
 		F01753937FBF5DB52205E603 /* WallpaperRegistrar.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE102B27DE211284D6355785 /* WallpaperRegistrar.swift */; };
 		F25CDFB47A64E7B07B1575D3 /* SystemWallpaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59389598AAE3B224008615B3 /* SystemWallpaper.swift */; };
 		F317EF9EE896BFBA1DC13557 /* ScreenPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E99411D794E4954894053274 /* ScreenPlayer.swift */; };
+		FC916F88162086834FC07EF5 /* AerialLockScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53654D59A9E90D0D4203E816 /* AerialLockScreen.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -85,8 +86,9 @@
 		2A65449730BC245F835B5C73 /* PlaybackSurvivesQuitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackSurvivesQuitTests.swift; sourceTree = "<group>"; };
 		2FBE8A0EAAE5BC9A8A6793E5 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		45D894AC6132FA15AB870009 /* LiveWallpaperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LiveWallpaperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		4F37DB5A073845178DD7C719 /* LiveWallpaperAgent */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = text; path = LiveWallpaperAgent; sourceTree = BUILT_PRODUCTS_DIR; };
+		4F37DB5A073845178DD7C719 /* LiveWallpaperAgent */ = {isa = PBXFileReference; includeInIndex = 0; path = LiveWallpaperAgent; sourceTree = BUILT_PRODUCTS_DIR; };
 		50D9CEFB6EC0505CF6041AE1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		53654D59A9E90D0D4203E816 /* AerialLockScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AerialLockScreen.swift; sourceTree = "<group>"; };
 		59389598AAE3B224008615B3 /* SystemWallpaper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemWallpaper.swift; sourceTree = "<group>"; };
 		960844E961DA0FD2EB181E9C /* WallpaperController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperController.swift; sourceTree = "<group>"; };
 		A14556FF96372DE2D94AFDB2 /* LiveWallpaper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LiveWallpaper.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -137,6 +139,7 @@
 		74298D901994E203AAA23822 /* Agent */ = {
 			isa = PBXGroup;
 			children = (
+				53654D59A9E90D0D4203E816 /* AerialLockScreen.swift */,
 				D6AD8BF20E36D8A161A5C1F2 /* FrameBlendView.swift */,
 				2875F570419E5A99A45E00FA /* main.swift */,
 				207BDBCCA6DFC8DE0D48AE1E /* MenuBarController.swift */,
@@ -275,6 +278,10 @@
 						DevelopmentTeam = SRKA3M5T33;
 						ProvisioningStyle = Manual;
 					};
+					FEB21040882441B719D13767 = {
+						DevelopmentTeam = SRKA3M5T33;
+						ProvisioningStyle = Manual;
+					};
 				};
 			};
 			buildConfigurationList = D2F0780513DFE67EB6FAD599 /* Build configuration list for PBXProject "LiveWallpaper" */;
@@ -303,6 +310,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FC916F88162086834FC07EF5 /* AerialLockScreen.swift in Sources */,
 				BF4671E8C96EEB9CB475DF42 /* FrameBlendView.swift in Sources */,
 				4DE7E8C918DBD356429506D3 /* MenuBarController.swift in Sources */,
 				12DDFAC308F29A013B2B885F /* MenuBarView.swift in Sources */,
@@ -381,11 +389,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = SRKA3M5T33;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = LiveWallpaper;
@@ -393,8 +397,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.hats.livewallpaper;
-				PROVISIONING_PROFILE_SPECIFIER = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.hari.LiveWallpaper;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -532,11 +535,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = SRKA3M5T33;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = LiveWallpaper;
@@ -544,8 +543,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.hats.livewallpaper;
-				PROVISIONING_PROFILE_SPECIFIER = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.hari.LiveWallpaper;
 				SDKROOT = macosx;
 			};
 			name = Release;

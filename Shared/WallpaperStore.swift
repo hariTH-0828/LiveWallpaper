@@ -8,6 +8,8 @@ enum ImportError: Error, Equatable, LocalizedError {
     case copyFailed(String)
     case notAFolder
     case noVideosInFolder
+    case tooLong(Double)
+    case noShortVideos
 
     var errorDescription: String? {
         switch self {
@@ -16,6 +18,10 @@ enum ImportError: Error, Equatable, LocalizedError {
         case .copyFailed(let reason): return "Couldn't copy the movie: \(reason)"
         case .notAFolder: return "The selection is not a folder."
         case .noVideosInFolder: return "The folder has no .mp4 videos."
+        case .tooLong(let seconds):
+            let total = Int(seconds.rounded())
+            return "This video is \(total / 60):\(String(format: "%02d", total % 60)) long. Choose one that's 1 minute or shorter."
+        case .noShortVideos: return "None of the folder's .mp4 videos are 1 minute or shorter."
         }
     }
 }
@@ -39,6 +45,10 @@ struct WallpaperStore {
         let playable = (try? await asset.load(.isPlayable)) ?? false
         let videoTracks = (try? await asset.loadTracks(withMediaType: .video)) ?? []
         guard playable, !videoTracks.isEmpty else { throw ImportError.unplayable }
+        if let duration = try? await asset.load(.duration), duration.isNumeric,
+           CMTimeGetSeconds(duration) > VideoLimits.maxDuration {
+            throw ImportError.tooLong(CMTimeGetSeconds(duration))
+        }
 
         let previous = currentConfig
         let destination = paths.videos
@@ -61,12 +71,13 @@ struct WallpaperStore {
     }
 
     /// Registers a folder whose .mp4 files the agent shuffles through, played in place.
-    /// Returns the config and the number of videos found now.
-    func importFolder(from url: URL) throws -> (config: WallpaperConfig, videoCount: Int) {
+    /// Returns the config and the number of videos short enough to play now.
+    func importFolder(from url: URL) async throws -> (config: WallpaperConfig, videoCount: Int) {
         let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
         guard isDirectory else { throw ImportError.notAFolder }
-        let videos = (try? FolderScanner.videos(in: url)) ?? []
-        guard !videos.isEmpty else { throw ImportError.noVideosInFolder }
+        guard !((try? FolderScanner.videos(in: url)) ?? []).isEmpty else { throw ImportError.noVideosInFolder }
+        let videos = (try? await FolderScanner.allowedVideos(in: url)) ?? []
+        guard !videos.isEmpty else { throw ImportError.noShortVideos }
 
         let previous = currentConfig
         try paths.ensureDirectories()

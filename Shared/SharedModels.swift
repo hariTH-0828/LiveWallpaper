@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 /// The registered wallpaper. Written by the app, read by the agent.
@@ -70,6 +71,74 @@ enum FolderScanner {
                     && (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
             }
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+    }
+
+    /// `videos(in:)` without the ones over `VideoLimits.maxDuration`, in the same order.
+    static func allowedVideos(in folder: URL) async throws -> [URL] {
+        let videos = try videos(in: folder)
+        let allowed = await withTaskGroup(of: (URL, Bool).self) { group in
+            for url in videos {
+                group.addTask { (url, await VideoDurations.shared.isAllowed(url)) }
+            }
+            var allowed = Set<URL>()
+            for await (url, isAllowed) in group where isAllowed {
+                allowed.insert(url)
+            }
+            return allowed
+        }
+        return videos.filter(allowed.contains)
+    }
+
+    /// Videos that can play and ones known to be too long, for display. Lengths come from
+    /// the cache, so videos not measured yet count as playable.
+    static func counts(in folder: URL) -> (playable: Int, tooLong: Int) {
+        let videos = (try? videos(in: folder)) ?? []
+        let tooLong = videos.filter { VideoDurations.shared.cachedIsTooLong($0) == true }.count
+        return (videos.count - tooLong, tooLong)
+    }
+}
+
+/// Videos longer than this never play, on the desktop or on the lock screen.
+enum VideoLimits {
+    static let maxDuration: TimeInterval = 60
+}
+
+/// Video lengths, cached by path and modification date so folder rescans stay cheap.
+final class VideoDurations: @unchecked Sendable {
+    static let shared = VideoDurations()
+
+    private struct Key: Hashable {
+        var path: String
+        var modified: Date?
+    }
+
+    private let lock = NSLock()
+    private var cache: [Key: Double] = [:]
+
+    func duration(of url: URL) async -> Double? {
+        let key = Self.key(for: url)
+        if let cached = lock.withLock({ cache[key] }) { return cached }
+        guard let time = try? await AVURLAsset(url: url).load(.duration), time.isNumeric else { return nil }
+        let seconds = CMTimeGetSeconds(time)
+        lock.withLock { cache[key] = seconds }
+        return seconds
+    }
+
+    /// Files whose length can't be read pass; playback's own failure handling skips them.
+    func isAllowed(_ url: URL) async -> Bool {
+        guard let seconds = await duration(of: url) else { return true }
+        return seconds <= VideoLimits.maxDuration
+    }
+
+    /// Nil when the video hasn't been measured yet.
+    func cachedIsTooLong(_ url: URL) -> Bool? {
+        let key = Self.key(for: url)
+        return lock.withLock { cache[key] }.map { $0 > VideoLimits.maxDuration }
+    }
+
+    private static func key(for url: URL) -> Key {
+        let modified = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        return Key(path: url.standardizedFileURL.path, modified: modified)
     }
 }
 

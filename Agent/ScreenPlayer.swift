@@ -49,6 +49,12 @@ final class ScreenPlayer {
     /// Last video that played to the end, so a new round doesn't repeat it straight away.
     private var lastPlayedURL: URL?
     private var failuresInARow = 0
+    /// Videos in the folder's last scan that are short enough to play.
+    private var roundSize = 0
+    /// Set while a folder rescan is measuring video lengths.
+    private var isScanning = false
+    /// Bumped by `reset()`, so a length check that a newer play or reload overtook is dropped.
+    private var loadToken = 0
     private var itemStatusObservation: NSKeyValueObservation?
     /// The folder item we started. Tracked here because AVQueuePlayer drops failed items,
     /// so `player.currentItem` is already nil by the time the failure arrives.
@@ -65,10 +71,21 @@ final class ScreenPlayer {
 
     // MARK: - Playback
 
+    /// Videos over `VideoLimits.maxDuration` are refused: nothing is shown, here or on the lock screen.
     func playSingle(_ url: URL) {
         reset()
-        looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
-        show(url)
+        let token = loadToken
+        Task {
+            let allowed = await VideoDurations.shared.isAllowed(url)
+            guard token == loadToken else { return }
+            guard allowed else {
+                lastError = "\(url.lastPathComponent) is longer than 1 minute"
+                hide()
+                return
+            }
+            looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
+            show(url)
+        }
     }
 
     func playFolder(_ url: URL) {
@@ -104,24 +121,41 @@ final class ScreenPlayer {
     }
 
     private func playNextInFolder() {
-        guard let folderURL else { return }
+        guard let folderURL, !isScanning else { return }
+        guard queue.isEmpty else { return playFromQueue() }
 
-        if queue.isEmpty {
-            // Rescan at the start of every round so added and removed files are picked up.
+        // Rescan at the start of every round so added and removed files are picked up.
+        // Videos over the length limit never make it into the queue.
+        isScanning = true
+        let token = loadToken
+        Task {
+            var videos: [URL] = []
+            var scanError: String?
             do {
-                queue = try newRound(from: FolderScanner.videos(in: folderURL))
-                lastError = nil
+                videos = try await FolderScanner.allowedVideos(in: folderURL)
             } catch {
-                lastError = "Can't read \(folderURL.path): \(error.localizedDescription)"
-                queue = []
+                scanError = "Can't read \(folderURL.path): \(error.localizedDescription)"
             }
+            guard token == loadToken else { return }
+            isScanning = false
+            lastError = scanError
+            roundSize = videos.count
+            queue = newRound(from: videos)
+            guard !queue.isEmpty else {
+                if lastError == nil {
+                    let hasVideos = !((try? FolderScanner.videos(in: folderURL)) ?? []).isEmpty
+                    lastError = hasVideos
+                        ? "No videos of 1 minute or less in \(folderURL.path)"
+                        : "No .mp4 videos in \(folderURL.path)"
+                }
+                hide()
+                return
+            }
+            playFromQueue()
         }
-        guard !queue.isEmpty else {
-            if lastError == nil { lastError = "No .mp4 videos in \(folderURL.path)" }
-            hide()
-            return
-        }
+    }
 
+    private func playFromQueue() {
         let busy = avoiding()
         let url = queue.remove(at: queue.firstIndex { !busy.contains($0) } ?? 0)
         let item = AVPlayerItem(url: url)
@@ -162,7 +196,6 @@ final class ScreenPlayer {
             failuresInARow += 1
             lastError = "Skipped unplayable \(currentURL?.lastPathComponent ?? "video")"
             // Every file in a full round failed: stop rather than spin.
-            let roundSize = ((try? FolderScanner.videos(in: folderURL)) ?? []).count
             if failuresInARow >= max(roundSize, 1) {
                 lastError = "No playable .mp4 videos in \(folderURL.path)"
                 hide()
@@ -295,6 +328,9 @@ final class ScreenPlayer {
         folderURL = nil
         queue = []
         failuresInARow = 0
+        roundSize = 0
+        isScanning = false
+        loadToken += 1
         lastError = nil
         player.pause()
         player.removeAllItems()
